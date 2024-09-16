@@ -2789,7 +2789,9 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
   }
 
   // Form the parameter list.
-  return ParameterList::create(SwiftContext, parameters);
+  // TODO: figure out the proper locaitons but we need something to avoid some assertions.
+  auto loc = clangDecl->getLocation();
+  return ParameterList::create(SwiftContext, importSourceLoc(loc), parameters, importSourceLoc(loc));
 }
 
 static bool isObjCMethodResultAudited(const clang::Decl *decl) {
