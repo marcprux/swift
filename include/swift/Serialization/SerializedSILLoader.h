@@ -43,11 +43,11 @@ class SILDifferentiabilityWitness;
 class SerializedSILLoader {
 private:
   std::vector<std::unique_ptr<SILDeserializer>> LoadedSILSections;
+  SILModule *Mod;
 
   explicit SerializedSILLoader(
       ASTContext &ctx, SILModule *SILMod,
       DeserializationNotificationHandlerSet *callbacks);
-
 public:
   /// Create a new loader.
   ///
@@ -60,6 +60,7 @@ public:
   }
   ~SerializedSILLoader();
 
+  SILModule *getModule() { return Mod; }
   SILFunction *lookupSILFunction(SILFunction *Callee, bool onlyUpdateLinkage);
   SILFunction *lookupSILFunction(StringRef Name,
                                  std::optional<SILLinkage> linkage);

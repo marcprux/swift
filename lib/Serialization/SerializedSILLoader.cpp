@@ -28,6 +28,7 @@ SerializedSILLoader::SerializedSILLoader(
     ASTContext &Ctx, SILModule *SILMod,
     DeserializationNotificationHandlerSet *callbacks) {
 
+  Mod = SILMod;
   // Get a list of SerializedModules from ASTContext.
   // FIXME: Iterating over LoadedModules is not a good way to do this.
   for (const auto &Entry : Ctx.getLoadedModules()) {
@@ -47,9 +48,21 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
   // It is possible that one module has a declaration of a SILFunction, while
   // another has the full definition.
   SILFunction *retVal = nullptr;
+
+  // If a callee is external and marked as [serialized_for_package], its body
+  // should only be deserialized for clients within the same package; for clients
+  // outside the package, it should remain a declaration. This ensures that
+  // instructions, which may only be valid in resilient mode when package optimization
+  // is enabled, aren't inlined at the call site, avoiding potential assert fails
+  // during sil-verify.
+  auto onlyUpdateLkg = onlyUpdateLinkage;
+  if (!onlyUpdateLkg &&
+      !getModule()->getSwiftModule()->inSamePackage(Callee->getParentModule()))
+    onlyUpdateLkg = Callee->getSerializedKind() == SerializedKind_t::IsSerializedForPackage;
+
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee,
-                                      /*declarationOnly*/ onlyUpdateLinkage)) {
+                                      /*declarationOnly*/ onlyUpdateLkg)) {
       LLVM_DEBUG(llvm::dbgs() << "Deserialized " << Func->getName() << " from "
                  << Des->getModuleIdentifier().str() << "\n");
       if (!Func->empty())
