@@ -148,20 +148,33 @@ namespace swift {
 
     SILFunction *getFuncForReference(StringRef Name, SILType Ty, TypeExpansionContext context);
     SILFunction *getFuncForReference(StringRef Name);
-    SILVTable *readVTable(serialization::DeclID);
+    /// Read and return the vtable identified with \p VID.
+    /// \p checkSerializedKind If set, serializedKind is looked up to determine whether to continue
+    /// reading VTable; if the imported module was optimized with Package CMO, thus containing entries
+    /// with a package-specific SerializedKind, such entires and their bodies can be deserialized into the
+    /// client only if they client is in the same package as the optimized module.
+    SILVTable *readVTable(serialization::DeclID VID, bool checkSerializedKind);
     SILMoveOnlyDeinit *readMoveOnlyDeinit(serialization::DeclID);
     SILGlobalVariable *getGlobalForReference(StringRef Name);
     SILGlobalVariable *readGlobalVar(StringRef Name);
 
     /// Read and return the witness table identified with \p WId.
+    /// \p checkSerializedKind If set, serializedKind is looked up to determine whether to continue
+    /// reading witnes table; if the imported module was optimized with Package CMO, thus containing entries
+    /// with a package-specific SerializedKind, such entires and their bodies can be deserialized into the
+    /// client only if they client is in the same package as the optimized module.
     SILWitnessTable *readWitnessTable(serialization::DeclID WId,
-                                      SILWitnessTable *existingWt);
+                                      SILWitnessTable *existingWt,
+                                      bool checkSerializedKind);
 
     /// Read the witness table identified with \p WId, return the table or
     /// the first error if any.
+    /// \p checkSerializedKind If set, serializedKind is looked up to determine whether to continue
+    /// reading witnes table; \c readWitnessTable(serialization::DeclID, SILWitnessTable, bool checkSerializedKind) above.
     llvm::Expected<SILWitnessTable *>
       readWitnessTableChecked(serialization::DeclID WId,
-                              SILWitnessTable *existingWt);
+                              SILWitnessTable *existingWt,
+                              bool checkSerializedKind);
 
     void readWitnessTableEntries(
            llvm::BitstreamEntry &entry,
@@ -190,9 +203,15 @@ namespace swift {
                                    bool declarationOnly = false);
     bool hasSILFunction(StringRef Name,
                         std::optional<SILLinkage> Linkage = std::nullopt);
-    SILVTable *lookupVTable(StringRef MangledClassName);
+    /// Return Vtable with \p MangledClassName.
+    /// \p checkSerializedKind If set, serializedKind is looked up to determine whether to continue
+    /// reading VTable; \c readWitnessTable(serialization::DeclID, SILWitnessTable, bool);
+    SILVTable *lookupVTable(StringRef MangledClassName, bool checkSerializedKind);
     SILMoveOnlyDeinit *lookupMoveOnlyDeinit(StringRef mangledNominalTypeName);
-    SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt);
+    /// Return witness table with a given witness table's info \p wt.
+    /// \p checkSerializedKind If set, serializedKind is looked up to determine whether to continue
+    /// reading VTable; \c readVTable(serialization::DeclID, bool).
+    SILWitnessTable *lookupWitnessTable(SILWitnessTable *wt, bool checkSerializedKind);
     SILDefaultWitnessTable *
     lookupDefaultWitnessTable(SILDefaultWitnessTable *wt);
     SILDifferentiabilityWitness *

@@ -58,7 +58,8 @@ SILFunction *SerializedSILLoader::lookupSILFunction(SILFunction *Callee,
   auto onlyUpdateLkg = onlyUpdateLinkage;
   if (!onlyUpdateLkg &&
       !getModule()->getSwiftModule()->inSamePackage(Callee->getParentModule()))
-    onlyUpdateLkg = Callee->getSerializedKind() == SerializedKind_t::IsSerializedForPackage;
+    onlyUpdateLkg = Callee->getLinkage() == SILLinkage::PackageExternal ||
+                    Callee->getSerializedKind() == SerializedKind_t::IsSerializedForPackage;
 
   for (auto &Des : LoadedSILSections) {
     if (auto Func = Des->lookupSILFunction(Callee,
@@ -115,7 +116,8 @@ SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
   std::string mangledClassName = mangler.mangleNominalType(C);
 
   for (auto &Des : LoadedSILSections) {
-    if (auto VT = Des->lookupVTable(mangledClassName))
+    if (auto VT = Des->lookupVTable(mangledClassName,
+            /*checkSerializedKind*/ !Mod->getSwiftModule()->inSamePackage(C->getModuleContext())))
       return VT;
   }
   return nullptr;
@@ -135,7 +137,8 @@ SerializedSILLoader::lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl) {
 
 SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
   for (auto &Des : LoadedSILSections)
-    if (auto wT = Des->lookupWitnessTable(WT))
+    if (auto wT = Des->lookupWitnessTable(WT,
+                                          !Mod->getSwiftModule()->inSamePackage(WT->getModule().getSwiftModule())))
       return wT;
   return nullptr;
 }

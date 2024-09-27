@@ -3773,7 +3773,7 @@ void SILDeserializer::getAllSILFunctions() {
   }
 }
 
-SILVTable *SILDeserializer::readVTable(DeclID VId) {
+SILVTable *SILDeserializer::readVTable(DeclID VId, bool checkSerializedKind) {
   if (VId == 0)
     return nullptr;
   assert(VId <= VTables.size() && "invalid VTable ID");
@@ -3812,6 +3812,9 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
     LLVM_DEBUG(llvm::dbgs() << "VTable classID is 0.\n");
     return nullptr;
   }
+  if (checkSerializedKind &&
+      SerializedKind_t(Serialized) == SerializedKind_t::IsSerializedForPackage)
+    return nullptr;
 
   ClassDecl *theClass = cast<ClassDecl>(MF->getDecl(ClassID));
 
@@ -3885,14 +3888,14 @@ SILVTable *SILDeserializer::readVTable(DeclID VId) {
   return vT;
 }
 
-SILVTable *SILDeserializer::lookupVTable(StringRef MangledClassName) {
+SILVTable *SILDeserializer::lookupVTable(StringRef MangledClassName, bool checkSerializedKind) {
   if (!VTableList)
     return nullptr;
   auto iter = VTableList->find(MangledClassName);
   if (iter == VTableList->end())
     return nullptr;
 
-  auto VT = readVTable(*iter);
+  auto VT = readVTable(*iter, checkSerializedKind);
   return VT;
 }
 
@@ -3901,8 +3904,9 @@ void SILDeserializer::getAllVTables() {
   if (!VTableList)
     return;
 
-  for (unsigned I = 0, E = VTables.size(); I < E; ++I)
-    readVTable(I+1);
+  for (unsigned I = 0, E = VTables.size(); I < E; ++I) {
+    readVTable(I+1, false);
+  }
 }
 
 SILMoveOnlyDeinit *SILDeserializer::readMoveOnlyDeinit(DeclID tableID) {
@@ -4130,8 +4134,9 @@ void SILDeserializer::readWitnessTableEntries(
 }
 
 SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
-                                                   SILWitnessTable *existingWt) {
-  auto deserialized = readWitnessTableChecked(WId, existingWt);
+                                                   SILWitnessTable *existingWt,
+                                                   bool checkSerializedKind) {
+  auto deserialized = readWitnessTableChecked(WId, existingWt, checkSerializedKind);
   if (!deserialized) {
     MF->fatal(deserialized.takeError());
   }
@@ -4140,7 +4145,8 @@ SILWitnessTable *SILDeserializer::readWitnessTable(DeclID WId,
 
 llvm::Expected<SILWitnessTable *>
   SILDeserializer::readWitnessTableChecked(DeclID WId,
-                                           SILWitnessTable *existingWt) {
+                                           SILWitnessTable *existingWt,
+                                           bool checkSerializedKind) {
   if (WId == 0)
     return nullptr;
   assert(WId <= WitnessTables.size() && "invalid WitnessTable ID");
@@ -4185,6 +4191,10 @@ llvm::Expected<SILWitnessTable *>
                             << " for SILFunction\n");
     MF->fatal("invalid linkage code");
   }
+
+  if (checkSerializedKind &&
+      SerializedKind_t(Serialized) == SerializedKind_t::IsSerializedForPackage)
+    return nullptr;
 
   // Deserialize Conformance.
   auto maybeConformance = MF->getConformanceChecked(conformance);
@@ -4267,8 +4277,9 @@ llvm::Expected<SILWitnessTable *>
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
+
   for (unsigned I = 0, E = WitnessTables.size(); I < E; ++I) {
-    auto maybeTable = readWitnessTableChecked(I + 1, nullptr);
+    auto maybeTable = readWitnessTableChecked(I + 1, nullptr, false);
     if (!maybeTable) {
       if (maybeTable.errorIsA<XRefNonLoadedModuleError>()) {
         // This is most likely caused by decls hidden by an implementation-only
@@ -4282,7 +4293,8 @@ void SILDeserializer::getAllWitnessTables() {
 }
 
 SILWitnessTable *
-SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
+SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt,
+                                    bool checkSerializedKind) {
   assert(existingWt && "Cannot deserialize a null witness table declaration.");
   assert(existingWt->isDeclaration() && "Cannot deserialize a witness table "
                                         "definition.");
@@ -4298,7 +4310,7 @@ SILDeserializer::lookupWitnessTable(SILWitnessTable *existingWt) {
     return nullptr;
 
   // Attempt to read the witness table.
-  auto Wt = readWitnessTable(*iter, existingWt);
+  auto Wt = readWitnessTable(*iter, existingWt, checkSerializedKind);
   if (Wt)
     LLVM_DEBUG(llvm::dbgs() << "Deserialize SIL:\n"; Wt->dump());
 
