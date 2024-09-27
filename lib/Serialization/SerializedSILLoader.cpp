@@ -116,6 +116,8 @@ SILVTable *SerializedSILLoader::lookupVTable(const ClassDecl *C) {
   std::string mangledClassName = mangler.mangleNominalType(C);
 
   for (auto &Des : LoadedSILSections) {
+    // Pass whether the VTable being looked up is in the same package boundary
+    // to determine whether it should be deserialized.
     if (auto VT = Des->lookupVTable(mangledClassName,
             /*checkSerializedKind*/ !Mod->getSwiftModule()->inSamePackage(C->getModuleContext())))
       return VT;
@@ -136,10 +138,13 @@ SerializedSILLoader::lookupMoveOnlyDeinit(const NominalTypeDecl *nomDecl) {
 }
 
 SILWitnessTable *SerializedSILLoader::lookupWitnessTable(SILWitnessTable *WT) {
-  for (auto &Des : LoadedSILSections)
+  for (auto &Des : LoadedSILSections) {
+    // Pass whether the VTable being looked up is in the same package boundary
+    // to determine whether it should be deserialized.
     if (auto wT = Des->lookupWitnessTable(WT,
                                           !Mod->getSwiftModule()->inSamePackage(WT->getModule().getSwiftModule())))
       return wT;
+  }
   return nullptr;
 }
 

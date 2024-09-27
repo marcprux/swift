@@ -3812,6 +3812,10 @@ SILVTable *SILDeserializer::readVTable(DeclID VId, bool checkSerializedKind) {
     LLVM_DEBUG(llvm::dbgs() << "VTable classID is 0.\n");
     return nullptr;
   }
+
+  // Vtable optimized with [serialized_for_package] (with Package CMO)
+  // should only be deserialized into a client if the client is in the
+  // same package as the module containing the Vtable.
   if (checkSerializedKind &&
       SerializedKind_t(Serialized) == SerializedKind_t::IsSerializedForPackage)
     return nullptr;
@@ -4192,6 +4196,9 @@ llvm::Expected<SILWitnessTable *>
     MF->fatal("invalid linkage code");
   }
 
+  // Witness table optimized with [serialized_for_package] (with Package CMO)
+  // should only be deserialized into a client if the client is in the same
+  // package as the module containing the witness table.
   if (checkSerializedKind &&
       SerializedKind_t(Serialized) == SerializedKind_t::IsSerializedForPackage)
     return nullptr;
@@ -4277,7 +4284,6 @@ llvm::Expected<SILWitnessTable *>
 void SILDeserializer::getAllWitnessTables() {
   if (!WitnessTableList)
     return;
-
   for (unsigned I = 0, E = WitnessTables.size(); I < E; ++I) {
     auto maybeTable = readWitnessTableChecked(I + 1, nullptr, false);
     if (!maybeTable) {
