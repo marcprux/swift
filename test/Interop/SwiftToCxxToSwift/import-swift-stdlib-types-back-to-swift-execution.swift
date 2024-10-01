@@ -19,6 +19,11 @@ inline swift::String createString() {
     return swift::String("Foobar");
 }
 
+// TODO: support swift::Optional<swift::String>
+inline swift::Optional<int> createOptionalString() {
+    return swift::Optional<int>::some(42);
+}
+
 #endif
 
 //--- module.modulemap
@@ -36,7 +41,9 @@ public func f() -> String? { "" }
 
 let str = createString()
 print(str)
+let opt = createOptionalString()
+print(opt)
 
 #endif
 
-// CHECK: Foobar
+// CHECK: Fobar
